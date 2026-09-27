@@ -1,0 +1,40 @@
+{
+  "name": "fleet",
+  "version": "1.0.0",
+  "description": "战舰单数 FLEET — 浏览器原生 Battleship Solitaire. 每个题面的唯一解由两条独立路线对账, 难度是求解器实测的假设栈深 depth, 不是星级.",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node server.cjs 5193",
+    "serve": "node server.cjs 5193",
+    "dev": "node server.cjs 5194",
+    "electron": "electron .",
+    "bake": "node tools/bake.mjs",
+    "check": "for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check \"$f\" || exit 1; done && node tools/playtest.mjs selftest && echo OK",
+    "unit": "for f in test/*.test.mjs; do node \"$f\" || exit 1; done",
+    "test": "npm run check && npm run unit",
+    "verify": "bash tools/verify.sh"
+  },
+  "keywords": [
+    "game",
+    "puzzle",
+    "battleship",
+    "battleship-solitaire",
+    "logic",
+    "unique-solution",
+    "solver",
+    "zero-dependency",
+    "electron"
+  ],
+  "author": "z-biz-game",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {},
+  "build": {
+    "appId": "com.zbiz.fleet",
+    "productName": "Fleet",
+    "mac": { "category": "public.app-category.puzzle-games" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage" }
+  }
+}

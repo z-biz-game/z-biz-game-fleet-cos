@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The rules, the solver, the enumerator, the generator, the shipped pool and the save file are
+  # all pure ES modules: no browser and no install step. Two rows are the reason this job exists:
+  #   * enumerate.test.mjs — the 4x4 navy is enumerated exhaustively (176 charts, every one of
+  #     them) and each chart's solution count is reconciled between the propagation solver and
+  #     the clue-free placement table; 5x5/6x6 are sampled and the sample rate is printed;
+  #   * lots.test.mjs — every printed `solutionCount`/`depth`/`guesses`/`band` in
+  #     js/data/lots.js is recomputed from the serialized puzzle, so a hand-edited difficulty
+  #     number fails the build instead of shipping.
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax
+        run: for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check "$f"; done
+      - name: Suites
+        run: for f in test/*.test.mjs; do echo "::group::$f"; node "$f"; echo "::endgroup::"; done
+
+  # The shell is only proven by driving a real page with real mouse events: the canvas hit test,
+  # the drag-to-lay gesture, the refusal of an over-running clue and the save file all live
+  # behind `window.fleet`. Injected JS can prove `commit()`; it cannot prove a finger reaches.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Headless playtest
+        env:
+          SKIP_UNIT: 1
+          WD_TIMEOUT: 240
+        run: bash tools/verify.sh

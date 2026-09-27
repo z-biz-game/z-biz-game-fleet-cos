@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1319">
+<meta name="description" content="战舰单数：按行列线索把一支舰队摆进图里，任何两格相邻（含斜角）的船不能共存。每个题面的唯一解由两条独立路线对账证明，难度是求解器实测的假设层数。">
+<link rel="icon" href="data:,">
+<title>战舰单数 · FLEET</title>
+<link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 class="brand"><span class="brand-mark">▲</span>战舰单数<small>FLEET</small></h1>
+  <nav class="modes" id="modes" aria-label="模式">
+    <button type="button" data-mode="campaign">战役</button>
+    <button type="button" data-mode="daily">每日</button>
+    <button type="button" data-mode="random">随机</button>
+  </nav>
+  <p class="totals" id="totals"></p>
+</header>
+
+<main class="stage">
+  <section class="board">
+    <canvas id="chart" aria-label="舰队图与行列线索"></canvas>
+    <p class="hint-line" id="hintline"></p>
+    <div class="curtain" id="curtain" hidden>
+      <div class="curtain-card">
+        <h2 id="verdict"></h2>
+        <p class="tally" id="tally"></p>
+        <div class="curtain-actions">
+          <button type="button" id="again">再来一次</button>
+          <button type="button" id="next" class="primary">下一题</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <p class="crumbs" id="crumbs"></p>
+    <div class="dock" id="dock"></div>
+    <dl class="readout" id="readout"></dl>
+    <div class="controls">
+      <button type="button" id="undo">撤销</button>
+      <button type="button" id="hint">提示</button>
+      <button type="button" id="restart">重开</button>
+      <button type="button" id="share">分享题面</button>
+    </div>
+    <div class="shelf" id="shelf"></div>
+    <details class="about">
+      <summary>屏幕上的数字从哪来</summary>
+      <p>一条线索数的是<em>船身格数</em>，不是船的数量。规则口径写死在 <code>js/core/rules.js</code>：船是直线段，<b>任何两格相邻（含斜角）的船不能共存</b> —— 这一条决定了推理能推多远，改了它，仓库里所有 fixture 与枚举表全部作废。</p>
+      <p><code>唯一解</code> 那个 1 不是声明，是两次独立计数的结果：<code>js/core/solve.js</code> 先纯推理（线索饱和、空格裁剪、斜角禁入、超长段裁水），推不动就<em>整条船</em>为单位假设并回溯，计数器封顶在 2；<code>js/core/enumerate.js</code> 走完全暴力的第二条腿——先枚举棋盘上所有合法摆法（只看舰长与不相邻，<b>一个线索都不看</b>），再用线索过滤枚举表数解。两条路线对每个出货题面必须给出同一个解数与同一个船格集合，见 <code>node test/enumerate.test.mjs</code> 与 <code>node test/lots.test.mjs</code>。</p>
+      <p><code>假设层数</code> 与 <code>推理枯竭</code> 是求解器解这一题时的实测栈深与枯竭次数：0 表示线索本身就能推到底。分带（纯推理 / +1 假设 / +2 假设）按这个数切，不按感觉切，见 <code>node tools/bake.mjs</code> 打印的表。</p>
+      <p class="save">记录只存在这台设备的浏览器里。<button type="button" id="wipe">清空存档</button></p>
+    </details>
+  </aside>
+</main>
+
+<p class="toast" id="toast" hidden></p>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
