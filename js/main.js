@@ -25,6 +25,7 @@ import {
 } from './core/library.js';
 import { todayKey } from './core/rng.js';
 import { createView } from './view.js';
+import './pwa.js'; // 离线注册：副作用导入，成功/失败都挂在 window.fleetPwa 上
 
 const $ = (id) => document.getElementById(id);
 const el = {
