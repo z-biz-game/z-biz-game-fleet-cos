@@ -310,7 +310,7 @@ function renderReadout() {
     field('唯一解', lot.solutionCount, '两条路线实测', 'par'),
     field('假设层数', lot.depth, `推理枯竭 ${lot.guesses} 次`, 'par'),
     field('题面', `${lot.n}×${lot.n}`, lot.id),
-    field('最好成绩', rec && rec.best !== undefined ? rec.best : '—', rec ? `下过 ${rec.plays} 次` : '还没有记录', 'best'),
+    field('最好成绩', rec && Number.isFinite(rec.best) ? rec.best : '—', rec ? `下过 ${rec.plays} 次` : '还没有记录', 'best'),
   ].join('');
   el.dock.innerHTML = renderDock(p);
   el.undo.disabled = !app.game.history.length || app.game.done;
