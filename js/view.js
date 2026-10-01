@@ -70,6 +70,14 @@ export function createView(canvas, handlers = {}) {
   let raf = 0;
   let last = 0;
   let warm = 0; // the first frames always repaint, so the canvas is never blank
+  // 定步长模拟。画布上的时间态（抖动、提示余量）只由 sim 步号决定：一帧里走几步取决于
+  // 这台机器此刻给了多少墙钟时间，而不是取决于状态怎么算 —— 于是 30/60/120Hz 下"同样的
+  // 虚拟时长之后画面一致"是可以逐字段对拍的事，不是"因为衰减刚好是线性的所以大概没问题"。
+  const SIM_STEP = 1 / 60;
+  const MAX_SUBSTEPS = 15; // 一次卡顿最多补 15 步；追不上的时间丢掉，不许攒成下一次的一堵墙
+  let accum = 0;
+  let simTime = 0;
+  let simSteps = 0;
   let paperPattern = null; // 底纹就绪后才有；null = 纯色回退，图面少一层颗粒而已
   let paused = false; // 暂停时 rAF 循环整个停掉，step() 一帧也拿不到 dt
   const motion = reducedMotionMedia();
@@ -440,7 +448,12 @@ export function createView(canvas, handlers = {}) {
     drawHint(now);
   }
 
-  function step(dt) {
+  // One simulation step. `dt` is always SIM_STEP here — that is the whole point: the state is a
+  // pure function of the step count, and the frame rate only decides how many of these a single
+  // rAF callback runs.
+  function simulate(dt) {
+    simSteps += 1;
+    simTime += dt;
     let busy = false;
     for (const [k, v] of shake) {
       const next = v - dt * 2.4;
@@ -456,7 +469,8 @@ export function createView(canvas, handlers = {}) {
         busy = true;
       }
     }
-    if (hint && performance.now() > hint.until) {
+    // 提示的寿命记在模拟时钟上：暂停时它不该自己过期，掉帧时它也不该少活一会儿。
+    if (hint && simTime >= hint.until) {
       hint = null;
       busy = true;
     }
@@ -465,10 +479,20 @@ export function createView(canvas, handlers = {}) {
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.064, (now - (last || now)) / 1000);
+    // `last || now` is the first-frame sentinel: a fresh clock must not charge the whole time
+    // since page load to the simulation. `dt` 只进累加器；物理量一律按 SIM_STEP 走，不看它。
+    const dt = Math.min(0.25, (now - (last || now)) / 1000);
     last = now;
-    const busy = step(dt);
-    if (busy || hint || warm < 4) {
+    accum += dt;
+    let moved = false;
+    let guard = 0;
+    while (accum >= SIM_STEP && guard < MAX_SUBSTEPS) {
+      accum -= SIM_STEP;
+      moved = simulate(SIM_STEP) || moved;
+      guard++;
+    }
+    if (guard >= MAX_SUBSTEPS) accum = 0;
+    if (moved || hint || warm < 4) {
       warm++;
       draw(now);
     }
@@ -503,13 +527,14 @@ export function createView(canvas, handlers = {}) {
       drag = null;
       stop();
     } else {
-      start();
+      start(); // start() 会把 last 归零：恢复的那一帧不算"暂停期间过去的时间"
     }
     return paused;
   }
 
   // Restart has to clear more than the board: the shake map, the pending highlight, the drag
-  // preview and the frame clock are all state a new attempt should not inherit.
+  // preview, the frame clock *and* the simulation odometer are all state a new attempt should
+  // not inherit. Zeroing `simSteps` is also what lets a frame-rate harness compare two runs.
   function resetAnimation() {
     if (press) clearTimeout(press.timer);
     press = null;
@@ -518,6 +543,9 @@ export function createView(canvas, handlers = {}) {
     shake.clear();
     last = 0;
     warm = 0;
+    accum = 0;
+    simTime = 0;
+    simSteps = 0;
     draw();
   }
 
@@ -618,7 +646,7 @@ export function createView(canvas, handlers = {}) {
     },
     // What the clue strip already proves, painted without any assumption.
     showDeduction(cells) {
-      hint = { cells: cells || [], until: performance.now() + 3200 };
+      hint = { cells: cells || [], until: simTime + 3.2 }; // 3.2 个模拟秒，不是 3.2 个墙钟秒
       start();
       draw(performance.now());
     },
@@ -637,6 +665,18 @@ export function createView(canvas, handlers = {}) {
         shake: shake.size,
         highlight: hint ? hint.cells.length : 0,
         dragging: !!drag,
+      };
+    },
+    // 帧率对拍读的窗口：每一步的状态都定长取整，比较的是"同一串步号算出了什么"，
+    // 不是浮点最后一位。accum 是步内相位，故意报出来但不作为判据。
+    sim() {
+      return {
+        steps: simSteps,
+        time: Number(simTime.toFixed(6)),
+        accum: Number(accum.toFixed(6)),
+        shake: [...shake.entries()].sort().map(([k, v]) => `${k}=${v.toFixed(6)}`),
+        highlight: hint ? hint.cells.length : 0,
+        hintLeft: hint ? Number((hint.until - simTime).toFixed(6)) : 0,
       };
     },
     pixelsHash() {

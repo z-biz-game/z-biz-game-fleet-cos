@@ -809,6 +809,7 @@ window.fleet = {
   setHelp(on) { return setHelp(on === undefined ? el.howto.hidden : on); },
   toggleFullscreen() { return toggleFullscreen(); },
   anim() { return view.anim(); },
+  sim() { return view.sim(); },
   sound() { return audio.state(); },
   pixels() { return view.pixelsHash(); },
   painted() { return view.painted(); },
