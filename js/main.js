@@ -25,6 +25,7 @@ import {
 } from './core/library.js';
 import { todayKey } from './core/rng.js';
 import { createView } from './view.js';
+import { createAudio } from './audio.js';
 import './pwa.js'; // 离线注册：副作用导入，成功/失败都挂在 window.fleetPwa 上
 
 const $ = (id) => document.getElementById(id);
@@ -34,6 +35,8 @@ const el = {
   verdict: $('verdict'), tally: $('tally'), undo: $('undo'), hint: $('hint'),
   restart: $('restart'), share: $('share'), next: $('next'), again: $('again'),
   toast: $('toast'), canvas: $('chart'), wipe: $('wipe'),
+  sound: $('sound'), pause: $('pause'), fullscreen: $('fullscreen'), help: $('help'),
+  resume: $('resume'), pauseveil: $('pauseveil'), howto: $('howto'), howtoClose: $('howto-close'),
 };
 
 const CHARTS = ALL.length;
@@ -47,7 +50,11 @@ const app = {
   hints: 0,
   label: '',
   day: null,
+  paused: false,
 };
+
+// 声音只有一个出口：js/audio.js。这里不判断"该不该响"（那是静音的活），只决定"这一步算什么声音"。
+const audio = createAudio(window);
 
 const CODE_NAMES = {
   outOfBounds: '船身画到图外去了',
@@ -98,6 +105,29 @@ const view = createView(el.canvas, {
   onQuery: (x, y) => commitQuery(x, y),
 });
 
+// --- 暂停 ---------------------------------------------------------------------------
+// 暂停改的是"这局还推不推进"，不是遮罩的透明度：画布的 rAF 循环被取消（`step()` 再也拿不到
+// dt，抖动与提示高亮都停在原地），音频上下文挂起，手势在 view 与这里各挡一次 —— 后者是为了
+// `window.fleet.drag()` 这类绕过手指的调用也挡得住，否则"暂停"只对鼠标成立。
+function setPaused(on) {
+  const next = !!on && !!app.game && !app.game.done;
+  if (app.paused === next) return app.paused;
+  app.paused = next;
+  view.setPaused(next);
+  if (next) audio.hold();
+  else audio.release(); // 静音态下 release 不会唤醒上下文：那是偏好，不是暂停的副作用
+  el.pauseveil.hidden = !next;
+  el.pause.setAttribute('aria-pressed', String(next));
+  el.pause.textContent = next ? '已暂停' : '暂停';
+  return app.paused;
+}
+
+function blocked() {
+  if (!app.paused) return false;
+  say('<b>已暂停</b> · 盘面不再推进：按 P 或点"继续"再下子');
+  return true;
+}
+
 function say(html) {
   el.hintline.innerHTML = html;
 }
@@ -107,6 +137,7 @@ function setGame(lot, label) {
   app.label = label || app.label;
   app.game = createGame(lot);
   app.hints = 0;
+  setPaused(false); // 换一题就是重新开始看盘，不把上一题的暂停带过来
   const draft = store.loadProgress(lot.id);
   let restored = false;
   if (draft) {
@@ -123,6 +154,7 @@ function setGame(lot, label) {
 // panel's own buttons all arrive here, and all get held to the same rule.
 function refuse(code, hull) {
   store.reject();
+  audio.play('refuse');
   const p = progress(app.game);
   if (hull) view.kickHull(hull);
   for (const line of statusOf(app.game).rows) if (line.over) view.kickLine('r', line.i);
@@ -134,9 +166,11 @@ function refuse(code, hull) {
 }
 
 function commitDrag(x, y, len, axis) {
+  if (blocked()) return false;
   const r = placeHull(app.game, x, y, len, axis);
   if (!r) return false;
   if (!r.ok) return refuse(r.code, { x, y, len, axis });
+  audio.play('place');
   after(`放入 <b>${len}</b> 格${axis === 'h' ? '横' : '竖'}船 · (${x},${y})`);
   return true;
 }
@@ -144,18 +178,22 @@ function commitDrag(x, y, len, axis) {
 // A tap on open water lays the shortest hull still in the dock (that is how a submarine gets
 // drawn — there is no drag short enough to draw one); a tap on a hull lifts it again.
 function commitTap(x, y) {
+  if (blocked()) return false;
   if (hullAt(app.game, x, y) >= 0) {
     if (!liftHull(app.game, x, y)) return false;
+    audio.play('mark');
     after(`捞起 (${x},${y}) 那条船`);
     return true;
   }
   const r = tapPlace(app.game, x, y);
   if (!r.ok) return refuse(r.code, { x, y, len: 1, axis: 'h' });
+  audio.play('place');
   after(`轻点放入 <b>${r.hull.len}</b> 格船 · (${x},${y})`);
   return true;
 }
 
 function commitWater(x, y) {
+  if (blocked()) return false;
   if (cellStateAt(x, y) === SHIP) {
     say(`<b>不计入</b> · 这一格已经有船了 —— 要换位置就先点它把它捞起来`);
     view.kickHull({ x, y, len: 1, axis: 'h' });
@@ -173,13 +211,16 @@ function commitWater(x, y) {
     return false; // already water: re-marking is not a second move
   }
   after('涂上一格水');
+  audio.play('water');
   return true;
 }
 
 function commitQuery(x, y) {
+  if (blocked()) return false;
   if (hullAt(app.game, x, y) >= 0) return false;
   if (!cycleMark(app.game, x, y)) return false;
   const on = cellStateAt(x, y) === MARK;
+  audio.play('mark');
   after(`铅笔 <b>?</b> ${on ? '落下' : '擦去'}`);
   return true;
 }
@@ -241,6 +282,8 @@ function finish(p) {
     + (rec.best === p.hulls ? '<br>这是这一题的最好成绩' : `<br>本机最好成绩 <b>${rec.best}</b> 次`);
   el.verdict.textContent = '舰队就位';
   el.curtain.hidden = false;
+  setPaused(false); // 解开了就不该停在暂停态：遮罩要把结果画在最后一帧上
+  audio.play('win');
   render();
 }
 
@@ -432,6 +475,7 @@ function hintOnce() {
   app.hints++;
   view.showDeduction(open);
   view.redraw();
+  audio.play('hint');
   const line = open.length
     ? `提示 ${open.length} 格：线索与斜角规则已经能定下这些位置（不含任何假设）`
     : '提示：这一格已经推不出去了，剩下的要靠假设 —— 这道题的实测假设层数是 ' + app.lot.depth;
@@ -448,28 +492,160 @@ el.modes.addEventListener('click', (ev) => {
 });
 
 el.undo.addEventListener('click', () => {
+  if (blocked()) return;
   if (!undo(app.game)) return;
+  audio.play('mark');
   persist();
   view.redraw();
   renderReadout();
   say('撤销一步');
 });
 
-el.hint.addEventListener('click', () => hintOnce());
+el.hint.addEventListener('click', () => { if (!blocked()) hintOnce(); });
 el.restart.addEventListener('click', restart);
 el.share.addEventListener('click', shareLink);
 el.again.addEventListener('click', restart);
 el.next.addEventListener('click', () => go(`#/c/${Math.min(CHARTS, app.index + 1)}`));
 
+// Restart resets more than the board. The view keeps a shake buffer, a pending deduction and a
+// drag preview, and the frame clock (`last`) is what makes the next dt meaningful: leaving any
+// of them behind means the new attempt inherits the old one's state, which is exactly what a
+// player pressing "重开" expects to lose.
 function restart() {
   resetGame(app.game);
   app.hints = 0;
   el.curtain.hidden = true;
   store.saveProgress(app.lot.id, '');
+  setPaused(false);
+  view.resetAnimation();
+  audio.reset();
   view.redraw();
   render();
   say('回到起点');
 }
+
+// --- 静音 / 全屏 / 玩法说明 ---------------------------------------------------------
+// 静音是 `ctx.suspend()`，不是把音量拧到看不见：js/audio.js 里那条断言（静音期间零个节点）
+// 就是为了让"字符串里有 mute"和"电池真的没在振膜"变成同一件事。
+function renderSound() {
+  const muted = audio.isMuted();
+  el.sound.setAttribute('aria-pressed', String(muted));
+  el.sound.textContent = muted ? '静音' : '有声';
+  el.sound.title = muted ? '取消静音（M）' : '静音（M）';
+  return muted;
+}
+
+function toggleMute() {
+  const muted = audio.toggle();
+  renderSound();
+  if (!muted) audio.play('mark'); // 刚解开的这一下是指纹按的，允许出声当作回执
+  return muted;
+}
+
+el.sound.addEventListener('click', toggleMute);
+el.pause.addEventListener('click', () => setPaused(!app.paused));
+el.resume.addEventListener('click', () => setPaused(false));
+
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function renderFullscreen() {
+  const on = isFullscreen();
+  el.fullscreen.setAttribute('aria-pressed', String(on));
+  el.fullscreen.textContent = on ? '退出全屏' : '全屏';
+  el.fullscreen.title = on ? '退出全屏（F）' : '全屏（F）';
+  return on;
+}
+
+// 全屏绑在真实的 #fullscreen 按钮上，F 只是它的别名：requestFullscreen 只肯在用户手势里生效，
+// 脚本自己调用会被拒。所以这里只承诺"按下去就一定试一次"，试不成就把原因说清楚。
+function toggleFullscreen() {
+  const doc = document;
+  if (isFullscreen()) {
+    const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
+    if (!exit) return Promise.resolve(renderFullscreen());
+    return Promise.resolve(exit.call(doc)).then(renderFullscreen, renderFullscreen);
+  }
+  const target = doc.documentElement;
+  const request = target.requestFullscreen || target.webkitRequestFullscreen;
+  if (!request) {
+    toast('这个浏览器没有开放全屏');
+    return Promise.resolve(false);
+  }
+  return Promise.resolve(request.call(target)).then(renderFullscreen, () => {
+    toast('全屏被拦下了：再点一次按钮（键盘的 F 也算一次手势）');
+    return renderFullscreen();
+  });
+}
+
+el.fullscreen.addEventListener('click', toggleFullscreen);
+for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(type, renderFullscreen);
+}
+
+// 玩法说明是一块盖在盘上的布：它挡住了 canvas，所以手势自然进不来 —— 不需要再为它做一套
+// "帮助模式"的判定分支。第一次在这台设备打开（存档里一条记录都没有）就自动摊开：规则没人
+// 读的话，"不计入"看起来就像 bug。
+function setHelp(on) {
+  const next = !!on;
+  el.howto.hidden = !next;
+  el.help.setAttribute('aria-pressed', String(next));
+  if (next) {
+    if (typeof el.howtoClose.focus === 'function') el.howtoClose.focus();
+  } else if (typeof el.canvas.focus === 'function') {
+    el.canvas.focus({ preventScroll: true });
+  }
+  return next;
+}
+
+el.help.addEventListener('click', () => setHelp(el.howto.hidden));
+el.howtoClose.addEventListener('click', () => setHelp(false));
+
+function freshDevice() {
+  return store.stats.solves === 0 && store.unlocked <= 1 && Object.keys(store.records).length === 0;
+}
+
+function closeOverlays() {
+  if (!el.howto.hidden) { setHelp(false); return; }
+  if (app.paused) { setPaused(false); return; }
+  if (!el.curtain.hidden) el.curtain.hidden = true;
+}
+
+// Enter/空格：覆盖层在的时候是"开始/继续"，都不在的时候是暂停的别名（§2 把两件事都给了它）。
+function startOrContinue() {
+  if (!el.howto.hidden) { setHelp(false); return 'help-closed'; }
+  if (app.paused) { setPaused(false); return 'resumed'; }
+  if (!el.curtain.hidden) {
+    el.curtain.hidden = true;
+    if (!el.next.hidden) el.next.click();
+    else el.again.click();
+    return 'advanced';
+  }
+  setPaused(true);
+  return 'paused';
+}
+
+window.addEventListener('hashchange', apply);
+window.addEventListener('resize', () => view.measure());
+window.addEventListener('keydown', (ev) => {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const k = ev.key.toLowerCase();
+  if (k === 'escape') closeOverlays();
+  else if (k === 'h' || k === '?') setHelp(el.howto.hidden);
+  else if (k === 'enter' || k === ' ') { ev.preventDefault(); startOrContinue(); }
+  else if (k === 'p') setPaused(!app.paused);
+  else if (k === 'm') toggleMute();
+  else if (k === 'f') toggleFullscreen();
+  else if (k === 'u') el.undo.click();
+  else if (k === 'g') el.hint.click();
+  else if (k === 'r') el.restart.click();
+});
+
+view.start();
+renderSound();
+renderFullscreen();
+if (freshDevice()) setHelp(true);
 
 // Wiping the save is the one destructive thing this game can do, so it asks twice instead of
 // firing on a stray click.
@@ -487,20 +663,9 @@ el.wipe.addEventListener('click', () => {
   apply();
 });
 
-window.addEventListener('hashchange', apply);
-window.addEventListener('resize', () => view.measure());
-window.addEventListener('keydown', (ev) => {
-  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-  const k = ev.key.toLowerCase();
-  if (k === 'escape' && !el.curtain.hidden) el.curtain.hidden = true;
-  else if (k === 'u') el.undo.click();
-  else if (k === 'h') el.hint.click();
-  else if (k === 'r') el.restart.click();
-});
-
-view.start();
 // Deliberately not paused on visibilitychange: a tab that reports itself hidden (headless
 // Chrome does) must still be able to paint the chart an automated finger is about to draw on.
+// 玩家的"暂停"只有一个入口：HUD 上的 #pause 按钮与 P/空格，见上面的 keydown。
 apply();
 
 // --- the test surface ---------------------------------------------------------------------
@@ -538,6 +703,13 @@ window.fleet = {
       curtain: !el.curtain.hidden,
       persistent: store.persistent(),
       day: app.day,
+      // 交互开关是行为，不是文案：浏览器侧要能直接读到"循环真的停了""上下文真的挂起了"。
+      paused: app.paused,
+      help: !el.howto.hidden,
+      fullscreen: isFullscreen(),
+      muted: audio.isMuted(),
+      reducedMotion: view.anim().reducedMotion,
+      loop: view.anim().raf,
     };
   },
   // The pool, as measurements only. `band` is the solver's stack depth, not a rating.
@@ -631,6 +803,13 @@ window.fleet = {
   undoOnce() { el.undo.click(); return app.game.hulls.length; },
   hintOnce() { return hintOnce(); },
   reset() { restart(); return app.game.hulls.length; },
+  // 开关也走同一条路：测试点的是按钮背后的函数，不是按钮的文案。
+  setPaused(on) { return setPaused(on === undefined ? !app.paused : on); },
+  toggleMute() { return toggleMute(); },
+  setHelp(on) { return setHelp(on === undefined ? el.howto.hidden : on); },
+  toggleFullscreen() { return toggleFullscreen(); },
+  anim() { return view.anim(); },
+  sound() { return audio.state(); },
   pixels() { return view.pixelsHash(); },
   painted() { return view.painted(); },
   store,

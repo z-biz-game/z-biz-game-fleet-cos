@@ -25,6 +25,20 @@ const PAD = 18;
 const GUT = 0.92; // clue gutter, in cells
 const LONG_PRESS = 450; // ms a held finger waits before it becomes a pencil mark
 const MOVE_SLOP = 6; // px of jitter that still counts as a tap
+
+// One reduce-motion reading for the whole repo: `css/game.css` and this file query the same
+// media feature, so "动效退化成静图" is not two definitions negotiated per screen. CSS drops
+// button transitions and the veil blur; the canvas drops the refusal shake and the hint pulse.
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function reducedMotionMedia() {
+  if (typeof window !== 'object' || typeof window.matchMedia !== 'function') return null;
+  try {
+    return window.matchMedia(REDUCED_MOTION_QUERY);
+  } catch {
+    return null; // a browser that throws on matchMedia is a browser without the preference
+  }
+}
 // 海图底纹：位图由 assets/gen/make_art.py 现画（256x256，四边可平铺）。它只是一层颗粒，
 // 取不到（file:// 打开、图片没解出来）就退回纯色，判定与读法一点都不会变。
 const PAPER_URL = 'assets/textures/chart-paper.png';
@@ -57,6 +71,9 @@ export function createView(canvas, handlers = {}) {
   let last = 0;
   let warm = 0; // the first frames always repaint, so the canvas is never blank
   let paperPattern = null; // 底纹就绪后才有；null = 纯色回退，图面少一层颗粒而已
+  let paused = false; // 暂停时 rAF 循环整个停掉，step() 一帧也拿不到 dt
+  const motion = reducedMotionMedia();
+  let reducedMotion = motion ? !!motion.matches : false;
 
   // Guarded on `Image`: this module is also imported by `node --check` and by the node-side
   // harness, where there is no DOM at all.
@@ -147,12 +164,15 @@ export function createView(canvas, handlers = {}) {
   }
 
   function kick(key) {
+    // reduce-motion 下抖动直接不存在，而不是"抖得很快"：拒绝的反馈本来就有两处不依赖动画
+    // （提示行的"不计入"与超线线索变红），关掉它不会让任何一条规则变得看不见。
+    if (reducedMotion) return;
     shake.set(key, 1);
     if (!raf) start();
   }
 
   function down(ev) {
-    if (!game || game.done || ev.button === 2) return;
+    if (!game || game.done || paused || ev.button === 2) return;
     const c = fromEvent(ev);
     if (!c) return; // the gutter and the margins are not squares, and cost nothing
     ev.preventDefault();
@@ -212,7 +232,7 @@ export function createView(canvas, handlers = {}) {
 
   function menu(ev) {
     ev.preventDefault();
-    if (!game || game.done) return;
+    if (!game || game.done || paused) return;
     const c = fromEvent(ev);
     if (c && on.onQuery) on.onQuery(c.x, c.y);
   }
@@ -374,7 +394,9 @@ export function createView(canvas, handlers = {}) {
   function drawHint(now) {
     if (!hint) return;
     const { cell } = geom;
-    const t = ((now % 1200) / 1200 + 1) % 1;
+    // 呼吸是装饰，方框本身是信息（"线索已经能定下这些格子"）。reduce-motion 留下信息，
+    // 去掉随时间变化的那一项：透明度固定，不再读 now。
+    const t = reducedMotion ? 0 : ((now % 1200) / 1200 + 1) % 1;
     ctx.save();
     ctx.lineWidth = Math.max(2, cell * 0.07);
     ctx.strokeStyle = `rgba(120, 220, 255, ${(0.85 - t * 0.55).toFixed(3)})`;
@@ -453,6 +475,7 @@ export function createView(canvas, handlers = {}) {
   }
 
   function start() {
+    if (paused) return; // 暂停期间谁都不能把循环叫醒：提示和拒绝都不算"该动了"
     if (!raf) {
       last = 0;
       warm = 0;
@@ -465,6 +488,39 @@ export function createView(canvas, handlers = {}) {
     raf = 0;
   }
 
+  // Pause is a switch on the *simulation*, not a CSS class: the loop is cancelled, so `step()`
+  // never receives a dt and nothing on the canvas can move or expire while the veil is up.
+  function setPaused(on) {
+    const next = !!on;
+    if (next === paused) return paused;
+    paused = next;
+    if (paused) {
+      // A finger that was down when the key arrived would otherwise commit on its release, and
+      // its long-press timer would still be holding a pencil mark for a square nobody is aiming
+      // at any more. Both are dropped rather than deferred.
+      if (press) clearTimeout(press.timer);
+      press = null;
+      drag = null;
+      stop();
+    } else {
+      start();
+    }
+    return paused;
+  }
+
+  // Restart has to clear more than the board: the shake map, the pending highlight, the drag
+  // preview and the frame clock are all state a new attempt should not inherit.
+  function resetAnimation() {
+    if (press) clearTimeout(press.timer);
+    press = null;
+    drag = null;
+    hint = null;
+    shake.clear();
+    last = 0;
+    warm = 0;
+    draw();
+  }
+
   canvas.addEventListener('pointerdown', down);
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
@@ -475,6 +531,18 @@ export function createView(canvas, handlers = {}) {
     draw();
   });
   canvas.addEventListener('contextmenu', menu);
+
+  // The preference can flip while the game is running (OS setting, or a browser's devtools
+  // emulation), and a player who turns it on mid-shake should not keep watching the rest of it.
+  if (motion) {
+    const onMotion = () => {
+      reducedMotion = !!motion.matches;
+      if (reducedMotion) shake.clear();
+      draw();
+    };
+    if (typeof motion.addEventListener === 'function') motion.addEventListener('change', onMotion);
+    else if (typeof motion.addListener === 'function') motion.addListener(onMotion);
+  }
 
   // The canvas's box is decided by CSS, and a `window` resize event is not enough to follow it:
   // a phone rotating, the panel's text reflowing or a devtools split all change the box without
@@ -559,6 +627,18 @@ export function createView(canvas, handlers = {}) {
     },
     measure,
     redraw: draw,
+    setPaused,
+    resetAnimation,
+    anim() {
+      return {
+        raf: !!raf,
+        paused,
+        reducedMotion,
+        shake: shake.size,
+        highlight: hint ? hint.cells.length : 0,
+        dragging: !!drag,
+      };
+    },
     pixelsHash() {
       const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       let sum = 0;

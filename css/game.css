@@ -26,7 +26,13 @@ body {
 }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 
-.topbar { display: flex; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+/* 安全区：`viewport-fit=cover` 让页面铺到刘海和底部横条底下，于是靠边的东西得自己让开。
+   env() 在没有安全区的设备上是 0，所以桌面那一版布局一个像素都没动 —— 不是补偿，是同一套
+   公式在两类设备上各自算出正确的数。 */
+.topbar {
+  display: flex; align-items: center; gap: 18px; border-bottom: 1px solid var(--line);
+  padding: calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left));
+}
 .brand { font-size: 16px; letter-spacing: 0.06em; display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .brand small { color: var(--ink-dim); font-size: 10px; letter-spacing: 0.28em; }
 .brand-mark { color: var(--steel); }
@@ -37,7 +43,11 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .totals { margin-left: auto; font-size: 12px; color: var(--ink-dim); }
 .totals b { color: var(--brass); font-weight: 600; }
 
-.stage { display: grid; grid-template-columns: minmax(0, 1fr) 348px; gap: 18px; padding: 18px; height: calc(100% - 53px); }
+.stage {
+  display: grid; grid-template-columns: minmax(0, 1fr) 348px; gap: 18px;
+  padding: 18px calc(18px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+  height: calc(100% - 53px - env(safe-area-inset-top));
+}
 .board { position: relative; display: grid; grid-template-rows: 1fr auto; min-height: 0; }
 #chart { width: 100%; height: 100%; min-height: 0; display: block; touch-action: none; }
 /* A fixed slot on purpose. The message line sits in the same grid as the canvas, so if it grew
@@ -110,8 +120,61 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .curtain-actions button { flex: 1; padding: 10px; font-size: 13px; border: 1px solid var(--line); border-radius: 9px; }
 .curtain-actions .primary { border-color: rgba(216, 161, 60, 0.6); color: var(--brass); background: rgba(216, 161, 60, 0.1); }
 
-.toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); font-size: 12px; color: var(--brass); }
+.toast { position: fixed; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); font-size: 12px; color: var(--brass); }
 .toast[hidden] { display: none; }
+
+/* HUD: the four things that change how the game behaves without changing the chart. */
+.hud { display: flex; gap: 6px; margin-left: auto; }
+.hud button {
+  min-width: 44px; min-height: 44px; padding: 0 12px; font-size: 12px;
+  color: var(--ink-dim); border: 1px solid var(--line); border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: color 120ms ease, border-color 120ms ease, transform 90ms ease;
+}
+.hud button:hover { color: var(--ink); border-color: rgba(226, 232, 240, 0.3); }
+.hud button:active { transform: translateY(1px); }
+.hud button[aria-pressed="true"] { color: var(--brass); border-color: rgba(216, 161, 60, 0.5); background: rgba(216, 161, 60, 0.1); }
+
+/* Veils over the chart: paused, and the rules card. Both reserve the chart's box, so
+   opening one never moves the board out from under a finger. */
+.veil { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 13, 18, 0.78); border-radius: 12px; text-align: center; }
+.veil[hidden] { display: none; }
+.veil p { font-size: 13px; color: var(--ink-dim); }
+.veil b { color: var(--ink); }
+.veil button { min-height: 44px; padding: 0 14px; margin-left: 8px; font-size: 12px; border: 1px solid rgba(216, 161, 60, 0.5); border-radius: 9px; color: var(--brass); }
+.howto { overflow: auto; padding: 12px; text-align: left; }
+.howto-card { width: min(560px, 100%); border: 1px solid rgba(216, 161, 60, 0.35); border-radius: 14px; background: var(--bg-2); padding: 20px 22px; }
+.howto-card h2 { font-size: 17px; margin-bottom: 10px; }
+.howto-card h3 { font-size: 12px; color: var(--brass); letter-spacing: 0.14em; margin: 14px 0 6px; }
+.howto-card ol, .howto-card ul { margin-left: 18px; display: grid; gap: 6px; }
+.howto-card li, .howto-card p { font-size: 12px; line-height: 1.75; color: var(--ink-dim); }
+.howto-card b { color: var(--ink); }
+.howto-card em { color: var(--cyan); font-style: normal; }
+.howto-card code { color: var(--brass); font-size: 11px; }
+.howto-card .gesture { list-style: none; margin-left: 0; }
+.howto-card .gesture b { display: inline-block; min-width: 76px; color: var(--cyan); }
+.howto-card kbd { font: inherit; font-size: 11px; color: var(--ink); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; }
+.howto-card .keys { line-height: 2.1; }
+.howto-foot { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+
+/* 命中区下限 44px（iOS HIG / WCAG 2.5.5 的口径）：可点的东西一律不小于它，
+   文字按钮靠 padding 撑，格子按钮靠 min-width/height 撑。 */
+.modes button, .controls button, .curtain-actions button, .shelf button, .about #wipe {
+  min-height: 44px; min-width: 44px;
+}
+.modes button { transition: color 120ms ease, background 120ms ease; }
+.controls button { transition: color 120ms ease, border-color 120ms ease, transform 90ms ease; }
+.controls button:active:not(:disabled) { transform: translateY(1px); }
+.curtain-actions button { transition: color 120ms ease, border-color 120ms ease; }
+
+/* reduceMotion 的真分支：动效退化为静图。画布那一侧（抖动、涟漪、提示呼吸）在
+   js/view.js 里读同一个 matchMedia，两边共用一条口径。 */
+@media (prefers-reduced-motion: reduce) {
+  .hud button, .modes button, .controls button, .curtain-actions button { transition: none; }
+  .hud button:active, .controls button:active:not(:disabled) { transform: none; }
+  .curtain, .veil { backdrop-filter: none; }
+  .dock .hull { transition: none; }
+}
 
 @media (max-width: 860px) {
   body { overflow: auto; }
