@@ -25,6 +25,10 @@ const PAD = 18;
 const GUT = 0.92; // clue gutter, in cells
 const LONG_PRESS = 450; // ms a held finger waits before it becomes a pencil mark
 const MOVE_SLOP = 6; // px of jitter that still counts as a tap
+// 海图底纹：位图由 assets/gen/make_art.py 现画（256x256，四边可平铺）。它只是一层颗粒，
+// 取不到（file:// 打开、图片没解出来）就退回纯色，判定与读法一点都不会变。
+const PAPER_URL = 'assets/textures/chart-paper.png';
+const PAPER_ALPHA = 0.72;
 
 function roundRect(ctx, x, y, w, h, r) {
   const rr = Math.max(0, Math.min(r, w / 2, h / 2));
@@ -52,6 +56,23 @@ export function createView(canvas, handlers = {}) {
   let raf = 0;
   let last = 0;
   let warm = 0; // the first frames always repaint, so the canvas is never blank
+  let paperPattern = null; // 底纹就绪后才有；null = 纯色回退，图面少一层颗粒而已
+
+  // Guarded on `Image`: this module is also imported by `node --check` and by the node-side
+  // harness, where there is no DOM at all.
+  if (typeof Image === 'function') {
+    const paper = new Image();
+    paper.onload = () => {
+      try {
+        paperPattern = ctx.createPattern(paper, 'repeat');
+      } catch {
+        paperPattern = null;
+      }
+      draw();
+    };
+    paper.onerror = () => { paperPattern = null; };
+    paper.src = PAPER_URL;
+  }
 
   function measure() {
     const box = canvas.getBoundingClientRect();
@@ -374,6 +395,15 @@ export function createView(canvas, handlers = {}) {
     ctx.fillStyle = '#151b24';
     roundRect(ctx, 10, 10, w - 20, h - 20, 14);
     ctx.fill();
+    if (paperPattern) {
+      // 同一张图底，多一层海图颗粒：静态、与帧无关，像素指纹不会因此抖。
+      ctx.save();
+      ctx.globalAlpha = PAPER_ALPHA;
+      ctx.fillStyle = paperPattern;
+      roundRect(ctx, 10, 10, w - 20, h - 20, 14);
+      ctx.fill();
+      ctx.restore();
+    }
     ctx.strokeStyle = 'rgba(226, 232, 240, 0.09)';
     ctx.lineWidth = 1;
     roundRect(ctx, 10, 10, w - 20, h - 20, 14);
