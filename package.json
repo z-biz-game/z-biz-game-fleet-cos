@@ -13,7 +13,9 @@
     "check": "for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check \"$f\" || exit 1; done && node tools/playtest.mjs selftest && echo OK",
     "unit": "for f in test/*.test.mjs; do node \"$f\" || exit 1; done",
     "test": "npm run check && npm run unit",
-    "verify": "bash tools/verify.sh"
+    "verify": "bash tools/verify.sh",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
   },
   "keywords": [
     "game",
@@ -33,8 +35,14 @@
   "build": {
     "appId": "com.zbiz.fleet",
     "productName": "Fleet",
-    "mac": { "category": "public.app-category.puzzle-games" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
+    "mac": {
+      "category": "public.app-category.puzzle-games"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
