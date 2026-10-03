@@ -53,6 +53,15 @@ export function createView(canvas, handlers = {}) {
   let last = 0;
   let warm = 0; // the first frames always repaint, so the canvas is never blank
 
+  // ---- 减弱动效（prefers-reduced-motion）----
+  // 两处装饰：① 提示圈 t = ((now % 1200) / 1200 + 1) % 1 喂给线宽与透明度；② 被拒的
+  // 那条线索 jx = Math.sin(s * 30) * s * cell * 0.18 —— 数字左右抖。
+  // 判据：被拒的格子同时被画成红色（上面那段 fillRect rgba(226,86,77,·)，随 s 衰减），
+  // 红色是"刚才这几格填错了"的画面证据；抖动只是叠在上面的装饰。所以只停 jx，
+  // **红色高亮与提示圈本体一律留着**。与 hashi / nine-rings / slide15 同口径。
+  let reduceMotion = false;
+  const hintPhase = () => (reduceMotion ? 0.5 : ((performance.now() % 1200) / 1200 + 1) % 1);
+
   function measure() {
     const box = canvas.getBoundingClientRect();
     const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
@@ -245,7 +254,7 @@ export function createView(canvas, handlers = {}) {
     ctx.font = `600 ${size}px "SF Mono", Menlo, Consolas, monospace`;
     const put = (txt, cx, cy, cls, key) => {
       const s = shake.get(key) || 0;
-      const jx = s > 0 ? Math.sin(s * 30) * s * cell * 0.18 : 0;
+      const jx = s > 0 && !reduceMotion ? Math.sin(s * 30) * s * cell * 0.18 : 0;
       ctx.fillStyle = cls === 'over' ? '#e2564d' : cls === 'full' ? '#d8a13c' : '#77839a';
       ctx.fillText(txt, cx + jx, cy);
     };
@@ -353,7 +362,7 @@ export function createView(canvas, handlers = {}) {
   function drawHint(now) {
     if (!hint) return;
     const { cell } = geom;
-    const t = ((now % 1200) / 1200 + 1) % 1;
+    const t = hintPhase();
     ctx.save();
     ctx.lineWidth = Math.max(2, cell * 0.07);
     ctx.strokeStyle = `rgba(120, 220, 255, ${(0.85 - t * 0.55).toFixed(3)})`;
@@ -461,6 +470,16 @@ export function createView(canvas, handlers = {}) {
   }
 
   return {
+    // The gate the runtime pref flip lands on: idempotent, repaints so a clue stops mid-jitter
+    // on the frame the setting changes rather than at the end of the decay.
+    setReduceMotion(v) {
+      const on = !!v;
+      if (on === reduceMotion) return reduceMotion;
+      reduceMotion = on;
+      if (reduceMotion) draw(performance.now());
+      return reduceMotion;
+    },
+    isReducedMotion: () => reduceMotion,
     attach(next) {
       game = next;
       hint = null;

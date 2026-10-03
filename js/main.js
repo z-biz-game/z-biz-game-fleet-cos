@@ -742,3 +742,22 @@ if (document.readyState === 'loading') {
 } else {
   bootFullscreen();
 }
+
+// ---- 减弱动效（prefers-reduced-motion）----
+//
+// 跟住系统设置，而且**运行中改设置要立刻生效**：只读一次 matchMedia 不够，玩家在系统里
+// 把开关拨回来，页面还停在上一次读到的答案上。addEventListener 是标准接口，老 Safari 只有
+// addListener —— 特性探测，不做 UA 判断。
+const motionQuery = typeof matchMedia === 'function'
+  ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+function applyReduceMotion(on) { view.setReduceMotion(on); }
+if (motionQuery) {
+  applyReduceMotion(motionQuery.matches);
+  if (typeof motionQuery.addEventListener === 'function') {
+    motionQuery.addEventListener('change', (e) => applyReduceMotion(e.matches));
+  } else if (typeof motionQuery.addListener === 'function') {
+    motionQuery.addListener((e) => applyReduceMotion(e.matches));
+  }
+}
+window.fleet.setReduceMotion = applyReduceMotion;
+window.fleet.isReducedMotion = () => view.isReducedMotion();
