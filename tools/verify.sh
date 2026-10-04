@@ -18,7 +18,7 @@
 # on its own. This game is 2D canvas, so plain headless Chrome is enough.
 set -u
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-CDP_PORT=${CDP_PORT:-9353}
+CDP_PORT=${CDP_PORT:-9353}; if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then echo ":$CDP_PORT is already LISTENING — a sibling gate or an orphan Chrome holds it; attaching there reads someone else's browser. Wait for it to finish, or rerun with CDP_PORT=<a free port>." >&2; lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >&2 || true; exit 6; fi  # 一机一台：撞在同一个默认口上时不报错的是 Chrome，报错的是绿——先让路再开闸
 WEB_PORT=${WEB_PORT:-5193}
 BASE=${BASE_URL:-http://127.0.0.1:$WEB_PORT/}
 CHROME=${CHROME_BIN:-}
