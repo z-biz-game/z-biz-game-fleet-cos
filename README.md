@@ -142,8 +142,6 @@ node tools/bake.mjs --check    # 重新出题 + 复验，不写文件
 | `verify` | `bash tools/verify.sh` | **是** | node 104 行 + 浏览器 151 行全绿，`=== ALL GREEN ===`，见下一节 |
 | `deploy-set` | `node tools/deploy-set.mjs` | 绿：对拷出来的产物提要求（见「上线的到底是哪一批文件」一节） |
 | `deploy-set:selftest` | `node tools/deploy-set-selftest.mjs` | 绿：9 刀逐类打红且点名 + 1 条阴性对照 |
-| `deploy-set` | `node tools/deploy-set.mjs` | 绿：对拷出来的产物提要求（见「上线的到底是哪一批文件」一节） |
-| `deploy-set:selftest` | `node tools/deploy-set-selftest.mjs` | 绿：9 刀逐类打红且点名 + 1 条阴性对照 |
 
 零依赖、零打包器、零图片素材：`dependencies` 与 `devDependencies` 都是 `{}`，画面全部由
 canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不是支持的玩法。
