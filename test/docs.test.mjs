@@ -151,8 +151,10 @@ function audit(text) {
 
 // ── 输入集当场从跟踪清单取，不写死文件名 ──────────────────────────────────────────────────────
 // 写死的清单会在有人新增一份 .md 的那天悄悄缩小样本，而它照样绿。
+// 也不许只挑仓根：哪天一份文档住进 docs/ 或某个子目录，`!f.includes('/')` 就把它悄悄关掉 ——
+// 那份就悄悄从样本里没了，而它照样绿。本仓今天的 .md 都还在仓根，这一句是给"以后那份"上的保险。
 const tracked = execFileSync('git', ['-C', ROOT, 'ls-files'], { encoding: 'utf8' }).split('\n').filter(Boolean);
-const docs = tracked.filter((f) => !f.includes('/') && f.endsWith('.md') && !/changelog|license/i.test(f));
+const docs = tracked.filter((f) => f.endsWith('.md') && !/changelog|license/i.test(f));
 const DOC_TEXT = docs.map((f) => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
 
 let checks = 0, fails = 0;
@@ -170,7 +172,7 @@ const loose = [...DOC_TEXT.matchAll(new RegExp('`(' + PATH_SRC + '):([0-9]+(?:[,
   .reduce((n, m) => n + m[2].split(',').length, 0);
 const looseBare = (DOC_TEXT.match(/`:[0-9]+(?:[,-][0-9]+)*`/g) || []).length;
 
-ok('D1 输入集不空：仓根的 .md 由跟踪清单当场数出（新增一份文档不会缩小样本）',
+ok('D1 输入集不空：跟踪清单里的 .md 当场数出（新增一份、或把它搬进子目录，都不会缩小样本）',
   docs.length >= 2, `本轮 ${docs.length} 份：${docs.join(', ') || '（一份都没扫到）'}`);
 ok('D2 每份文档都至少贡献一条引用：某份被跳过时这里红，而不是条数悄悄变少',
   docs.every((f) => audit(fs.readFileSync(path.join(ROOT, f), 'utf8')).refs.length > 0),
