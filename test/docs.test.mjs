@@ -245,7 +245,30 @@ if (anchorHit) {
     `可判文件 ${cited.length} 个里找不到一个「声明名 + 不含该名的非空行」配对`);
 }
 
-console.log(`\n文档行号对账：${docs.length} 份文档 · ${A.refs.length} 条引用 · ${A.refs.filter((r) => r.anchor).length} 条带指认 · ${A.cont} 条续引 · ${A.foreign} 条跨仓`);
+// ── D10 抄写台账：文档抄着的每个读数都必须等于本轮实数 ────────────────────────────────────────
+// 上面那些数由这条腿打印；文档把它们抄过去之后，就成了第二句没人核的话——代码一改，抄的那句就漂，
+// 而漂了的读数看着仍像实测。所以这里逐处对账：文档里凡印了这些标签的地方，数必须等于本轮实数。
+// 「一处都没写」同样要红：那说明这条腿的读数已经从文档里消失，闸不会替一句不存在的话作证。
+// 台账的判据数用本腿独有的说法（`文档行号对账 N 条`），不拿 `rows: N fail: M` 当锚——
+// 同一份文档里还抄着别几套的 rows，拿那个形状当锚就会拿别人的数来判这条腿。
+const anchoredN = A.refs.filter((r) => r.anchor).length;
+const eqn = (label, re, mine) => {
+  const claims = [...DOC_TEXT.matchAll(re)].map((x) => Number(x[1]));
+  ok(label, claims.length >= 1 && claims.every((c) => c === mine),
+    `闸数到 ${mine} · 文档写了 ${claims.length} 处：${[...new Set(claims)].join('/') || '（一处都没写）'}`);
+};
+eqn('D10 抄写台账「N 份文档」：文档印的份数等于跟踪清单里当场数出的 .md 数', /(\d+) 份文档/g, docs.length);
+eqn('D10 抄写台账「N 条引用」：文档抄的是本轮实解析数，不是上一轮那个数', /(\d+) 条引用/g, A.refs.length);
+eqn('D10 抄写台账「N 条带指认」', /(\d+) 条带指认/g, anchoredN);
+eqn('D10 抄写台账「N 条续引」（同句内借到出处的条数）', /(\d+) 条续引/g, A.cont);
+eqn('D10 抄写台账「N 条跨仓」（按形状分出去、只数不判的那几条）', /(\d+) 条跨仓/g, A.foreign);
+const ledgerClaims = [...DOC_TEXT.matchAll(/文档行号对账 (\d+) 条/g)].map((x) => Number(x[1]));
+const totalChecks = checks + 1;
+ok('D10 抄写台账「文档行号对账 N 条判据」：等于本轮实发的条数（删一条断言、或文档抄了上一轮的数，都撞在这里）',
+  ledgerClaims.length >= 1 && ledgerClaims.every((c) => c === totalChecks),
+  `本轮 ${totalChecks} 条 · 文档写了 ${ledgerClaims.length} 处：${[...new Set(ledgerClaims)].join('/') || '（一处都没写）'}`);
+
+console.log(`\n文档行号对账：${docs.length} 份文档 · ${A.refs.length} 条引用 · ${anchoredN} 条带指认 · ${A.cont} 条续引 · ${A.foreign} 条跨仓 · ${totalChecks} 条判据`);
 console.log(`rows: ${checks} fail: ${fails}`);
 console.log(`RESULT docs-test ok=${fails === 0} checks=${checks} fails=${fails}`);
 if (fails) process.exit(1);
