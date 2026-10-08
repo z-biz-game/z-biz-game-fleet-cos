@@ -116,6 +116,10 @@ const hasWord = (text, name) => {
 function audit(text) {
   const orphans = [];
   const refs = parseRefs(text, orphans);
+  const orphanAt = (tok) => {
+    const i = text.indexOf('`' + tok + '`');
+    return i < 0 ? tok : `${tok}@第 ${text.slice(0, i).split('\n').length} 行`;
+  };
   const outOfRange = [];
   const anchorBad = [];
   let foreign = 0;
@@ -146,7 +150,7 @@ function audit(text) {
     if (!lines) outOfRange.push(`${k[1]}（${k[2]} 行）文件不存在`);
     else if (lines.length !== Number(k[2])) outOfRange.push(`${k[1]} 实测 ${lines.length} 行，文档写的是 ${k[2]}`);
   }
-  return { refs, outOfRange, anchorBad, cont: refs.filter((r) => r.cont).length, unaddressed: orphans.length, foreign };
+  return { refs, outOfRange, anchorBad, cont: refs.filter((r) => r.cont).length, unaddressed: orphans.length, orphans: orphans.map(orphanAt), foreign };
 }
 
 // ── 输入集当场从跟踪清单取，不写死文件名 ──────────────────────────────────────────────────────
@@ -185,7 +189,7 @@ ok('D4 锚点腿：贴着引用那个名字必须作为**完整标识符**出现
 ok('D5 条数等式：本腿的解析段数 = 另一条独立数法（只按形状数）的段数 + 续引借来的段数',
   A.refs.length === loose + A.cont, `解析 ${A.refs.length} = 形状数 ${loose} + 续引 ${A.cont} · 文档里另有 ${looseBare} 处裸续引`);
 ok('D6 续引都借到了路径：句号/分号/空行/新标题截断之后借不到的计入「无法定址」，一处都不许静默跳过',
-  A.unaddressed === 0, `续引 ${A.cont} 条 · 无法定址 ${A.unaddressed} 条${A.unaddressed ? '：' + A.unaddressed : ''}`);
+  A.unaddressed === 0, `续引 ${A.cont} 条 · 无法定址 ${A.unaddressed} 条${A.unaddressed ? '：' + A.orphans.slice(0, 4).join(' | ') + (A.unaddressed > 4 ? ` …共 ${A.unaddressed} 处` : '') : ''}`);
 // 跨仓那几条被 D3/D4 分出去不判，这里就得有一条独立的数法对账：只按形状数，不看文件在不在。
 // 两边同源于 parseRefs 的等式（`foreign === refs.filter(...)`）恒真，什么都拦不住，所以右边另起一路；
 // 逗号列出的每一段各算一条，续引借到跨仓路径的那些单独加回（形状那一路看不见它们）。
