@@ -192,7 +192,7 @@ totals: 96 lots from 771 draws, 96 unique charts accepted (12.5%)
 
 ### 7.2 台架：2026-09-27 红的那 11 行，后来是怎么绿的（2026-09-28）
 
-本机 `bash tools/verify.sh`（web `:5193`、devtools `:9353`）现在 `exit 0`：node 8 套 **104** 行、
+本机 `bash tools/verify.sh`（web 端口 `5193`、devtools 端口 `9353`）现在 `exit 0`：node 8 套 **104** 行、
 浏览器 6 套 **151** 行（`@boot` 19 / `@play` 30 / `@routes` 22 / `@save` 26 / `@reloaded` 9 /
 `@pointer` 45），控制台干净，收尾"Chrome 退出 + 临时 profile 已删"那条也过。
 `js/core` 一条没改 —— 七条根因**全在台架与视图的坐标/事件契约上**，逐条如下（引用一律按断言名，
