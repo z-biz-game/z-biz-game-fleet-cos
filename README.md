@@ -77,9 +77,9 @@ node tools/bake.mjs --check    # 重新出题 + 复验，不写文件
 
 ## 承诺表：每条承诺都有一道真会红的命令守着
 
-右列的条数是**本轮（2026-09-29）在这台机器上跑出来的**，不是估的：`rows: N fail: M` 由
+右列的条数是**本轮（2026-10-08）在这台机器上跑出来的**，不是估的：`rows: N fail: M` 由
 `tools/harness.mjs:40` 打印，`rows` 数的是**看得见的用例**（一条用例里可以有好几个 `ok/eq`），
-所以"104 行"是 104 条能被点名的失败，不是 104 个断言表达式。
+所以"113 行"是 113 条能被点名的失败，不是 113 个断言表达式。
 
 | 屏上/文档里的承诺 | 哪条命令会红 | 它判什么 | 本轮读数与出处 |
 | --- | --- | --- | --- |
@@ -95,12 +95,13 @@ node tools/bake.mjs --check    # 重新出题 + 复验，不写文件
 | 现场生成有边界、会终止、拒绝半成品 | `node tools/bake.mjs --check` | 每掷一次 `makeChart(..., {maxAttempts: 1, budget: 600000})`，拒绝原因**原样打印**；`solve` 撞线记 `truncated`、`countByTable` 撞线记 `tableTruncated`，两种都直接丢弃（`js/core/make.js:124,131`） | 本轮 96 关出自 771 掷（12.5%）；六档的 `rejections` 里**没有** `truncated`/`tableTruncated` 这两个键 |
 | 分数只存本机，清档要点两次 | `node test/storage.test.mjs`、`@save` / `@reloaded` | 后端缺席/方法抛错/写超额都只降级不崩；`best` 只会变小、`unlocked` 只会变大；盘上形状 = 内存形状，盘上的垃圾要能扛住；`reset` 真清盘（不只清缓存） | node `rows: 11 fail: 0`；本轮 `@save` 26 行、`@reloaded` 9 行 |
 | 同一条链接在任何设备上是同一张图 | `node test/lots.test.mjs`、`@routes` | `dailyLot(date)` 必须逐日等于 `LOTS[hashSeed('daily|date') % 96]`（走混子，不走时钟）；连续 40 天的种子两两不同；`randomLot` 不许出带，24 个 token 要落到多张图上；未知档给 `null` | node `rows: 13 fail: 0`（含这三条用例）；本轮 `@routes` 22 行 |
+| 文档里印着的每个行号还坐在它说的那一行 | `node test/docs.test.mjs` | README 与 DESIGN 的每一处形如「某文件第 N 行」的引用都要落在盘上真实存在、且不是整段空白的行上；贴着引用写的那个名字必须作为**完整标识符**出现在被指的那几行里（整词，不是子串）；裸续引要向同一句里最近的那条完整引用借路径，借不到就计入「无法定址」；跨仓的引用只数不判（单仓 checkout 读不到别的仓的行号）；范围与锚点两半各配一把现量靶子的反空转对照，量不到靶子的那一格自己改口"没被证明过"并变红 | `rows: 15 fail: 0`；本轮 2 份文档、34 条引用、3 条带指认、2 条续引、0 条无法定址、0 条跨仓、文档行号对账 15 条判据 —— 这几个数由这条腿逐处对账，文档里印歪一格或整段不印都会红（D10 抄写台账） |
 | `js/core` 不知道有屏幕 | **没有这道闸** | 本轮 grep `js/core/*.js` 里的 `window` / `document`：三处命中全是注释（`js/core/board.js:10`、`js/core/solve.js:31`、`js/core/storage.js:1`），代码里没有一处。但**没有任何测试会因为它变红** | 见「已知边界」最后一条：这条靠人查，同组织的 kakurasu 有源码级扫描，本仓没有 |
 
-表里点名的**8 套 node 门禁**合起来本轮是 **104 条用例、0 失败**；浏览器层 **151 行、0 失败**，
+表里点名的**9 套 node 门禁**合起来本轮是 **113 条用例、0 失败**；浏览器层 **151 行、0 失败**，
 加在一起是 `bash tools/verify.sh` 交回的 `=== ALL GREEN ===`。这一层没有 `RESULT:` 汇总行——
 每套自己打印一行 `rows: N fail: M`，`=== ALL GREEN ===` 只在 `tools/verify.sh` 末尾出现。
-最后那行"`js/core` 不知道有屏幕"**不在**这 104 条里，因为它没有命令——它是全表唯一一格写着"没有这道闸"的承诺。
+最后那行"`js/core` 不知道有屏幕"**不在**这 113 条里，因为它没有命令——它是全表唯一一格写着"没有这道闸"的承诺。
 
 ### 上面那些"会红"是怎么验出来的
 
@@ -140,6 +141,8 @@ node tools/bake.mjs --check    # 重新出题 + 复验，不写文件
 | `bake` | `node tools/bake.mjs` | 只跑了 `--check` 形态 | `--check` 不写盘：本轮打印 `recheck: 96/96 …` 后是 `unchanged: js/data/lots.js`，`git status` 干净。去掉 `--check` 会**改写题库源文件**，文档轮不动已发货的题库，所以没跑 |
 | `electron` | `electron .` | **否** | `dependencies`/`devDependencies` 都是 `{}`，仓里没有 `node_modules`，`electron` 也不在这台机器的 PATH；`electron/main.cjs` 只是那份 34 行的壳 |
 | `verify` | `bash tools/verify.sh` | **是** | node 104 行 + 浏览器 151 行全绿，`=== ALL GREEN ===`，见下一节 |
+| `deploy-set` | `node tools/deploy-set.mjs` | 绿：对拷出来的产物提要求（见「上线的到底是哪一批文件」一节） |
+| `deploy-set:selftest` | `node tools/deploy-set-selftest.mjs` | 绿：9 刀逐类打红且点名 + 1 条阴性对照 |
 
 零依赖、零打包器、零图片素材：`dependencies` 与 `devDependencies` 都是 `{}`，画面全部由
 canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不是支持的玩法。
@@ -150,17 +153,17 @@ canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不
 放在手指下面是不能接受的卡顿。`#/random/<tier>` 不带 token 时会立刻 `location.replace` 补一个
 token，免得同一链接每次打开是不同题。
 
-## 门禁清单：本轮（2026-09-29）逐条复跑
+## 门禁清单：本轮（2026-10-08）逐条复跑
 
 ```bash
-npm test                     # check（25 个文件 parse + 5 个场景函数 parse）+ 8 套 node 用例
+npm test                     # check（逐个源文件 parse + playtest selftest）+ 9 套 node 用例
 node tools/bake.mjs --check  # 重新出题并复验，只读
 bash tools/verify.sh         # 上一条 + 真起 headless Chrome、真发鼠标事件的 6 套浏览器用例
 ```
 
 本轮读数（都是这台机器上一次性跑完的，日志留在工作区根的 `_tmp-fleet-*.log`，判据按日志行而不是管道退出码）：
 
-* node：`rows: 10 fail: 0`、`13`、`15`、`12`、`13`、`18`、`12`、`11` —— **104 条用例，0 失败**；
+* node：`rows: 10 fail: 0`、`9`、`13`、`15`、`12`、`13`、`18`、`12`、`11` —— **113 条用例，0 失败**；
 * 浏览器：`@boot 19 / @play 30 / @routes 22 / @save 26 / @reloaded 9 / @pointer 45` —— **151 行，0 失败**，
   汇总行 `=== browser rows: 151 ===`；`=== console ===` 段是 `(none)`；收尾 `=== chrome exited, temp profile gone ===`
   之后才有 `=== ALL GREEN ===`；
@@ -178,15 +181,15 @@ bash tools/verify.sh         # 上一条 + 真起 headless Chrome、真发鼠标
 
 ## 已知边界（诚实清单）
 
-* 台架的浏览器段是**真起 Chrome、真发鼠标事件**跑的：本轮 `bash tools/verify.sh`（web `:5193` /
-  devtools `:9353`）交回 `=== ALL GREEN ===`，node 104 行 + 浏览器 151 行、控制台 `(none)`、
+* 台架的浏览器段是**真起 Chrome、真发鼠标事件**跑的：本轮 `bash tools/verify.sh`（web 端口 `5193` /
+  devtools 端口 `9353`）交回 `=== ALL GREEN ===`，node 104 行 + 浏览器 151 行、控制台 `(none)`、
   收尾要求本次的 Chrome 已退出、临时 profile 已删。
-  **这条闸挡不住"别的会话留着的那台 Chrome"**：`tools/verify.sh:44-51` 只预检自己的 `:9353`
-  （被占退 5）和 `:5193`（被占退 6），不做全机孤儿检查。本轮这台机器上就有一台别的仓的
-  headless Chrome 在听 `:9373`（profile `/tmp/sky-chrome-profile`），它既不挡本仓的门，也不替本仓作证——
-  本仓的 151 行是在自己的端口、自己的临时 profile 上跑出来的，跑完由 `:183-197` 收尾断言确认
+  **这条闸挡不住"别的会话留着的那台 Chrome"**：`tools/verify.sh:44-51` 只预检自己的 devtools 端口 `9353`
+  （被占退 5）和 web 端口 `5193`（被占退 6），不做全机孤儿检查。本轮这台机器上就有一台别的仓的
+  headless Chrome 在听端口 `9373`（profile `/tmp/sky-chrome-profile`），它既不挡本仓的门，也不替本仓作证——
+  本仓的 151 行是在自己的端口、自己的临时 profile 上跑出来的，跑完由 `tools/verify.sh:183-197` 收尾断言确认
   只有**自己那台**退干净了。浏览器段没有任何墙钟断言（`grep Date.now tools/playtest.mjs` 本轮只命中两处，
-  都在 `waitShell` 的等 shell 超时里，`:231,238`），所以机器同时忙别的事不会把绿的跑成红的，反之亦然。
+  都在 `waitShell` 的等 shell 超时里，见 `tools/playtest.mjs:231,238`），所以机器同时忙别的事不会把绿的跑成红的，反之亦然。
   2026-09-27 这份 README 写的是"现在是红的，96 行里 11 条失败"；那 11 条连同后来在指针套件里挖出的
   两条（CDP 的 release 必须报 `button:'left'`；松手在棋盘外会把长按计时器留在起手那一格）
   逐条写在 `DESIGN.md` §7.2，七条根因全在台架与视图侧，`js/core` 一行没改。
@@ -227,7 +230,7 @@ bash tools/verify.sh         # 上一条 + 真起 headless Chrome、真发鼠标
 
 ---
 
-## 目录（本轮实测：`check` 那条 glob 展开 25 个文件）
+## 目录（本轮 2026-10-08 实测：`check` 那条 glob 展开 29 个文件）
 
 ```
 index.html (63 行) · css/game.css (115 行)
@@ -246,11 +249,14 @@ js/data/lots.js       96 行烘焙产物，每行一个 JSON：题面 + 两条�
 tools/harness.mjs     42 行，其中 :40 打印 `rows: N fail: M`
 tools/playtest.mjs    CDP 驱动 + 六个浏览器套件（五个页内函数字符串 + @pointer 真发鼠标事件）
 tools/bake.mjs        出题、复验、渲染 lots.js；--check 只读
-test/*.test.mjs       上表那 8 套 node 门禁
+test/*.test.mjs       上表那 9 套 node 门禁（`docs` 那套读的是本 README 与 DESIGN 的行号引用）
 server.cjs · electron/main.cjs · .github/workflows/{ci,pages}.yml
 ```
 
 设计说明在 `DESIGN.md`（规则来源与"为什么按船假设"在它的前三节，浏览器那 11 条红的根因在 §7.2），
+tools/assemble-site.sh  部署产物的唯一清单（pages.yml 与本地闸调同一支）
+tools/deploy-set.mjs  部署集闸：检查即将上传的那份产物
+tools/deploy-set-selftest.mjs  部署集闸的阴性自证（每一类断言当场打红一次）
 交付清单在 `deliverable.md`。
 
 ## 端口与 URL 形态
@@ -264,3 +270,49 @@ server.cjs · electron/main.cjs · .github/workflows/{ci,pages}.yml
 
 页内模块都用相对路径 import，所以 Pages 的 `/<repo>/` 前缀不需要任何特殊处理；
 反过来说，双击 `index.html` 走 `file://` 时 ES module 会被 origin 规则拒掉，这不是支持的玩法。
+
+## 上线的到底是哪一批文件
+
+这个仓没有打包器：站点=一次文件拷贝。以前「拷哪些」写在 `pages.yml` 的 `run:` 里（手抄的几行
+`cp`）。本地 `index.html` 直读仓库根，永远自洽；线上却按那份清单拷，于是页面后来引用的
+`manifest.webmanifest`、`sw.js`、`icons/*` 可能一个都没上去——线上 404，而仓里的引擎测试与
+真浏览器闸全绿，因为它们跑的都是仓库根，没有任何一步在「按清单拷」的那个环境下加载过页面。
+
+现在清单只有一份，住在 `tools/assemble-site.sh`：CI 调它拷 `_site`，本地闸调它拷临时目录，
+然后**对拷出来的产物**提要求（`tools/deploy-set.mjs`）：
+
+- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行，
+  `ci.yml` 里必须真有 `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
+  路径——注释里本来就会写它，只 grep 字符串会被一句散文喂绿。
+- **R 引用可达**：引用不靠手打名单。从 `index.html` 的 `href/src` 出发，凡解析出来是 `.js`/`.css`
+  的就把那一站也扫一遍（CSS 的 `url()`、JS 去掉注释后的 `'./…'` 字面量、`new URL(x, base)` 的两种
+  基、`navigator.serviceWorker.register`、`scope`），`manifest` 的 icons/screenshots/shortcuts 各自
+  的 `src` 也算引用。取径上读不到的那一站本身就是红（读不到＝这一站根本没扫）。每条引用都必须在
+  产物里且非 0 字节；绝对路径单列一条红，因为 Pages 挂在 `/<repo>/` 前缀下会跳出去。
+- **P 位图不许说谎**：`manifest` 声明的 `sizes` 必须等于 PNG IHDR 的真实宽高——文件图标读文件头，
+  内联成 base64 的图标先解码再读同一段。后一条不是可选项：图标可能住在清单里而不是盘上的 `.png`
+  （有的仓另有一条"零二进制文件"的承诺，那条只约束"有没有 .png 这个文件"）；如果 P 段只筛文件名，
+  声明写 512 而真图 192 就一路放行。
+- **钉住两个数**：R 段实际检查的路径条数（`30`）与这一次跑的断言条数（`48`），两个数
+  都钉在 `tools/deploy-set.mjs` 顶部的那对常量里。没改页面却掉了，说明解析断了；删掉一张图标会同时
+  少一条 R10 与那张的 P1/P2，所以两个数一起钉，断言条数能漂就是闸在缩水的信号。这一节故意只写数值、
+  不写那对常量的名字，也不写别仓文档闸的编号：有的仓的文档闸会拿"文档里出现过的同名标识号"回数它
+  自己的条数，还有的会把文档里点到的每个组编号逐个核对"这一轮真的发过"——两道闸共用一个名字，
+  或者在本仓的文档里出现一个本仓没有的组编号，打红的都是不相干的那一边。
+
+`tools/deploy-set-selftest.mjs` 是这两颗钉的阳性证明：它把仓库复制到临时目录，照着每一类断言
+各下一刀（X1 清单不收位图目录 / X2 模块边改名 / X3 CSS 写绝对路径 / X4 `start_url` 绝对 /
+X5 删光 >=512 图标 / X6 少一个必填字段 / X7 声明尺寸与真图不符 / X8 workflow 不调脚本 /
+X9 CI 不跑闸 / X10 是阴性对照——往入口 JS 追加一行只写在注释里的假路径，闸必须仍然绿、条数仍然
+`30`、断言仍然 `48`；X11 og:image 退回相对路径 / X12 og:image 的前缀指向别的 slug /
+X13 内联位图谎报尺寸——只在有靶子时下：X11/X12 要页面上那句 og:image，X13 要清单里真有一段 base64
+图标，没有就打印 SKIP；反过来 X1 没有位图目录可砍时改砍 css，P 段一位都不核时台架直接报靶子不够），
+要求每一刀都让闸**点名**变红。靶子从 `DEPLOY_SET_DUMP=1`
+的出处表现挑（取径真的会读的那支 JS / 那一张 CSS，不写死某一个仓的入口名），所以页面改了、仓与仓
+不同，台架跟着走。
+
+`node tools/deploy-set.mjs` 与 `node tools/deploy-set-selftest.mjs` 就是 CI 跑的那两条命令本身
+（package.json 里的 `deploy-set` / `deploy-set:selftest` 只是同一支脚本的 npm 入口）；本仓的整闸在 `tools/verify.sh` 的 `=== deploy-set ===` 那一段也各跑一次。它们红的时候并进本仓那条出口的退出码——这一条是这么证的：
+把 ci.yml 里那行 `run: node tools/deploy-set.mjs` 砍掉，本仓整闸必须点名红且退出码非 0。
+所以「本地全绿、线上 404 自己的 manifest / sw.js / 图标」这一类坏法在本地就会红。
+

@@ -4,3 +4,4 @@ node_modules/
 dist/
 .electron-cache/
 _site/
+_scratch/
