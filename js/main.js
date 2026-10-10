@@ -560,24 +560,6 @@ function renderFullscreen() {
 
 // 全屏绑在真实的 #fullscreen 按钮上，F 只是它的别名：requestFullscreen 只肯在用户手势里生效，
 // 脚本自己调用会被拒。所以这里只承诺"按下去就一定试一次"，试不成就把原因说清楚。
-function toggleFullscreen() {
-  const doc = document;
-  if (isFullscreen()) {
-    const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
-    if (!exit) return Promise.resolve(renderFullscreen());
-    return Promise.resolve(exit.call(doc)).then(renderFullscreen, renderFullscreen);
-  }
-  const target = doc.documentElement;
-  const request = target.requestFullscreen || target.webkitRequestFullscreen;
-  if (!request) {
-    toast('这个浏览器没有开放全屏');
-    return Promise.resolve(false);
-  }
-  return Promise.resolve(request.call(target)).then(renderFullscreen, () => {
-    toast('全屏被拦下了：再点一次按钮（键盘的 F 也算一次手势）');
-    return renderFullscreen();
-  });
-}
 
 el.fullscreen.addEventListener('click', toggleFullscreen);
 for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
