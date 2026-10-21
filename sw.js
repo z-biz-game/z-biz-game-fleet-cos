@@ -9,12 +9,46 @@
 //      同名文件重绘之后，网络优先这一条保证客户端下一次联网就拿到新字节。
 const VERSION = 'fleet-cos-v1';
 const CACHE = `${VERSION}-shell`;
-const PRECACHE = ['index.html', 'manifest.webmanifest'];
+// 离线壳：界面 + 引擎 + 样式 + 运行时真读的位图，逐条列全。
+// 之前只有 index.html 与 manifest 两件，断网时界面能开但引擎与纹理全缺 ——
+// 半截壳比白屏更难认（画布空着、按钮点了没反应）。
+// 清单里每一条都必须真的在盘上（闸逐条核），所以加文件要先改这一行。
+const SHELL = [
+  './',
+  'index.html',
+  'manifest.webmanifest',
+  'css/game.css',
+  'js/main.js',
+  'js/sw-register.js',
+  'js/audio.js',
+  'js/view.js',
+  'js/pwa.js',
+  'js/core/board.js',
+  'js/core/enumerate.js',
+  'js/core/game.js',
+  'js/core/library.js',
+  'js/core/make.js',
+  'js/core/rng.js',
+  'js/core/rules.js',
+  'js/core/solve.js',
+  'js/core/storage.js',
+  'js/data/lots.js',
+  'assets/textures/chart-paper.png',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/icon-1024.png',
+  'icons/apple-touch-icon.png',
+  'icons/favicon-32.png',
+];
 
 self.addEventListener('install', (ev) => {
-  // 首屏两件套先抓下来：断网时至少能打开界面，而不是浏览器的错误页。
+  // 逐条抓：一条 404 不该把整壳作废（addAll 是全有全无的）。
+  // 这条与存档那边同一条规矩——坏一条只丢那一条。
   ev.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE).catch(() => {})).then(() => self.skipWaiting())
+    caches
+      .open(CACHE)
+      .then((c) => Promise.allSettled(SHELL.map((u) => c.add(u))))
+      .then(() => self.skipWaiting())
   );
 });
 

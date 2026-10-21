@@ -3,8 +3,8 @@
   "short_name": "战舰单数",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0a0a12",
-  "theme_color": "#0a0a12",
+  "background_color": "#0f1319",
+  "theme_color": "#0f1319",
   "icons": [
     {
       "src": "icons/icon-192.png",

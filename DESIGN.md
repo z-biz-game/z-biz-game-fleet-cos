@@ -202,11 +202,11 @@ totals: 96 lots from 771 draws, 96 unique charts accepted (12.5%)
    当列号，而 `js/view.js:501-511` 的返回对象里 `x/y` 是 **client 像素**，棋盘格在 `cell` 字段。
    现在它同时验两头：`back.cell === [1,2]`（格号对）**且** `back.x/y === cellPoint(1,2)` 的像素
    （往返闭合）。只断格号会放过"像素是隔壁格的"那一类错，所以两条都要。
-2. **`@play` 的参数顺序**。`water` 的签名是 `water(x, y)`（`js/main.js:157` 的 `commitWater`），
+2. **`@play` 的参数顺序**。`water` 的签名是 `water(x, y)`（`js/main.js:195` 的 `commitWater`），
    台架把第一个参数当行读。`water is accepted where both lines read zero` 现在断
    `g.water(1, 0) === true && g.board()[1] === '~'` —— 下标 1 是第 0 行第 1 列，笔迹和坐标对得上。
 3. **`playAll()` 踩在上一段的残局上**（@play 那 9 连红的直接原因）。裸 `load()` 不是新题面：
-   `js/main.js:104-119` 的 `setGame()` 会 `store.loadProgress()` 把本机草稿复水回来，于是 `plan()`
+   `js/main.js:135-151` 的 `setGame()` 会 `store.loadProgress()` 把本机草稿复水回来，于是 `plan()`
    的三笔全撞船 → 实测 `{laid: 0, watered: 7}`。修法是 `load()` 之后紧跟 `reset()`
    （`the printed navy plays out through the gestures` 那一行），并且另起一条
    `@play` 断言把"撤销要一格一格走"挪到一张**还没解完**的图上 —— 图一旦 solved，`撤销` 按钮就是
