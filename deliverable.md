@@ -59,8 +59,9 @@ ES module 是严格模式，同一作用域里两个同名函数声明直接是 
 
 ## 2. 文档锚点漂移
 
-`DESIGN.md` 两处引用的行号对不上并线后的结果：`commitWater` 的 `js/main.js:157` → `195`，
-`setGame` 的 `js/main.js:104-119` → `135-151`。D4 锚点腿逐条核过（被指的行段整段不许是空行）。
+`DESIGN.md` 两处引用的行号对不上并线后的结果：`commitWater` 旧指 157 行、现指 `js/main.js:195`，
+`setGame` 旧指 104-119 行、现指 `js/main.js:135-151`。旧值只作改动留痕、故意不再用 `路径:行号` 的形状印：
+那个形状是被当轮引用判的（D4 锚点腿逐条核过，名字必须作为完整标识符出现在被指的行段里）。
 
 ## 3. 离线壳
 
@@ -116,7 +117,7 @@ z-biz-game-fleet-cos                     | LOADED          ← 改前是 LOAD-ER
 $ python3 z-biz-game-lead/003_辅助能力/polish/script/scan_cos_static.py . z-biz-game-fleet-cos
 汇总: {}
 $ npm test --silent
-rows: 9 fail: 0    rows: 10 fail: 0   rows: 15 fail: 0   rows: 13 fail: 0
+rows: 9 fail: 0    rows: 10 fail: 0   rows: 17 fail: 0   rows: 13 fail: 0
 rows: 15 fail: 0   rows: 12 fail: 0   rows: 13 fail: 0   rows: 11 fail: 0
 rows: 18 fail: 0   rows: 12 fail: 0   rows: 14 fail: 0   rows: 14 fail: 0
 $ node tools/deploy-set.mjs

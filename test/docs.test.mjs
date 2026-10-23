@@ -251,22 +251,59 @@ if (anchorHit) {
 
 // ── D10 抄写台账：文档抄着的每个读数都必须等于本轮实数 ────────────────────────────────────────
 // 上面那些数由这条腿打印；文档把它们抄过去之后，就成了第二句没人核的话——代码一改，抄的那句就漂，
-// 而漂了的读数看着仍像实测。所以这里逐处对账：文档里凡印了这些标签的地方，数必须等于本轮实数。
+// 而漂了的读数看着仍像实测。所以这里逐处对账：台账句里印了这些标签的地方，数必须等于本轮实数。
 // 「一处都没写」同样要红：那说明这条腿的读数已经从文档里消失，闸不会替一句不存在的话作证。
 // 台账的判据数用本腿独有的说法（`文档行号对账 N 条`），不拿 `rows: N fail: M` 当锚——
 // 同一份文档里还抄着别几套的 rows，拿那个形状当锚就会拿别人的数来判这条腿。
+// 对账域同样按这个理由收窄，见下面 ledgerText 那段。
 const anchoredN = A.refs.filter((r) => r.anchor).length;
+// 对账域只取"本腿自己那句读数"所在的那几行，判据是行里印着 `份文档`——这个说法只有本腿打印。
+// 早先这里直接拿 /(\d+) 条引用/ 扫整叠文档 join 起来的全文，于是把部署集腿自己印的
+// 「部署集：34 条引用」也抓来跟本腿的引用数比：两套腿各数各的引用（那一套数的是部署清单里的
+// 文件条目，这一套数的是文档里的 `path:NN`），谁也不等于谁，部署集改一个数字就把这里顶红，
+// 而本腿的承诺里从来没有那一格。这正是上面那句「拿别人的数来判这条腿」，只不过撞在共享标签上。
+// 别人的数由别人的腿钉（deploy-set-selftest 钉部署集那一跑），这里不越界，也不许反过来
+// 把文档里部署集那几行改掉来凑本腿的数。
+const ledgerText = (t) => t.split('\n').filter((l) => l.includes('份文档')).join('\n');
+const LEDGER = ledgerText(DOC_TEXT);
+const RE_REFS = /(\d+) 条引用/g;
 const eqn = (label, re, mine) => {
-  const claims = [...DOC_TEXT.matchAll(re)].map((x) => Number(x[1]));
+  const claims = [...LEDGER.matchAll(re)].map((x) => Number(x[1]));
   ok(label, claims.length >= 1 && claims.every((c) => c === mine),
-    `闸数到 ${mine} · 文档写了 ${claims.length} 处：${[...new Set(claims)].join('/') || '（一处都没写）'}`);
+    `闸数到 ${mine} · 对账域里写了 ${claims.length} 处：${[...new Set(claims)].join('/') || '（一处都没写）'}`);
 };
 eqn('D10 抄写台账「N 份文档」：文档印的份数等于跟踪清单里当场数出的 .md 数', /(\d+) 份文档/g, docs.length);
-eqn('D10 抄写台账「N 条引用」：文档抄的是本轮实解析数，不是上一轮那个数', /(\d+) 条引用/g, A.refs.length);
+eqn('D10 抄写台账「N 条引用」：文档抄的是本轮实解析数，不是上一轮那个数', RE_REFS, A.refs.length);
 eqn('D10 抄写台账「N 条带指认」', /(\d+) 条带指认/g, anchoredN);
 eqn('D10 抄写台账「N 条续引」（同句内借到出处的条数）', /(\d+) 条续引/g, A.cont);
 eqn('D10 抄写台账「N 条跨仓」（按形状分出去、只数不判的那几条）', /(\d+) 条跨仓/g, A.foreign);
-const ledgerClaims = [...DOC_TEXT.matchAll(/文档行号对账 (\d+) 条/g)].map((x) => Number(x[1]));
+
+// ── D11 上一段那个"域"本身要能被证伪：收窄不许顺手把牙齿也收掉 ──────────────────────────────
+// 只改判据不配对照，就是拿一句话换另一句话。两把都是现量靶子：右柄用本轮实数 + 1 造一句台账行，
+// 左柄从本轮文档里找那一行真的不属于台账的 `条引用`——找不到就自己改口"这一格没被证明过"并变红。
+{
+  const t = ledgerText(`${docs.length} 份文档 · ${A.refs.length + 1} 条引用 · ${anchoredN} 条带指认`);
+  const claims = [...t.matchAll(RE_REFS)].map((x) => Number(x[1]));
+  ok('D11 台账反空转：把本轮实数改 1 印成台账行，对账域必须仍然认它是台账、并且数不等于实数',
+    claims.length === 1 && claims[0] === A.refs.length + 1,
+    `造了 ${A.refs.length + 1}（实数 ${A.refs.length}）· 对账域认出 ${claims.length} 处：${claims.join('/') || '（这一格空转了：台账行不再被认）'}`);
+}
+{
+  const foreignLine = DOC_TEXT.split('\n').find((l) => /\d+ 条引用/.test(l) && !l.includes('份文档')) || '';
+  if (foreignLine) {
+    const both = `${LEDGER}\n${foreignLine}`;
+    const inDomain = [...ledgerText(both).matchAll(RE_REFS)].map((x) => Number(x[1]));
+    const inWhole = [...both.matchAll(RE_REFS)].map((x) => Number(x[1]));
+    ok('D11 台账对账域不认别人的读数：文档里那一行不属于本腿的 `N 条引用` 一条都不许计进来',
+      inWhole.length === inDomain.length + 1 && inDomain.length >= 1,
+      `别人的行「${foreignLine.slice(0, 40)}…」· 全文扫到 ${inWhole.length} 处（${inWhole.join('/')}）而台账域只认 ${inDomain.length} 处（${inDomain.join('/')}）`);
+  } else {
+    ok('D11 台账对账域：本轮文档里没有一行印着「N 条引用」却不属于台账句——这一格没被证明过', false,
+      `跟踪的 ${docs.length} 份文档里每一处「条引用」都在台账句内，无靶子`);
+  }
+}
+
+const ledgerClaims = [...LEDGER.matchAll(/文档行号对账 (\d+) 条/g)].map((x) => Number(x[1]));
 const totalChecks = checks + 1;
 ok('D10 抄写台账「文档行号对账 N 条判据」：等于本轮实发的条数（删一条断言、或文档抄了上一轮的数，都撞在这里）',
   ledgerClaims.length >= 1 && ledgerClaims.every((c) => c === totalChecks),
