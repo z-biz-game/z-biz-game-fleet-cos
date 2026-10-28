@@ -18,8 +18,10 @@ const SHELL = [
   'index.html',
   'manifest.webmanifest',
   'css/game.css',
+  'css/studio.css',
   'js/main.js',
   'js/sw-register.js',
+  'js/haptics.js',
   'js/audio.js',
   'js/view.js',
   'js/pwa.js',
@@ -39,6 +41,7 @@ const SHELL = [
   'icons/icon-1024.png',
   'icons/apple-touch-icon.png',
   'icons/favicon-32.png',
+  'icons/favicon-16.png',
 ];
 
 self.addEventListener('install', (ev) => {

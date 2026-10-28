@@ -90,7 +90,7 @@ ES module 是严格模式，同一作用域里两个同名函数声明直接是 
 丢失  （无）
 ```
 
-所以把钉数改成 34 / 53 —— 闸自己的口径就是「改了页面就把 EXPECT_CHECKS 一起改，别让它默默变少」。
+所以把钉数改成 34 / 53（2026-10-28 art 批次后又重钉到 36 / 55）—— 闸自己的口径就是「改了页面就把 EXPECT_CHECKS 一起改，别让它默默变少」。
 
 ## 6. 真实文件清单
 
@@ -121,11 +121,11 @@ rows: 9 fail: 0    rows: 10 fail: 0   rows: 17 fail: 0   rows: 13 fail: 0
 rows: 15 fail: 0   rows: 12 fail: 0   rows: 13 fail: 0   rows: 11 fail: 0
 rows: 18 fail: 0   rows: 12 fail: 0   rows: 14 fail: 0   rows: 14 fail: 0
 $ node tools/deploy-set.mjs
-部署集：34 条引用（含 3 张位图尺寸核对），失败 0 项
-rows: 53 fail: 0
+部署集：36 条引用（含 3 张位图尺寸核对），失败 0 项
+rows: 55 fail: 0
 $ node tools/deploy-set-selftest.mjs
 DS_SELFTEST rc=0（0=每一刀都按预期发力、阴性对照按预期不发力）
-DS_SELFTEST_BASELINE 部署集：34 条引用（含 3 张位图尺寸核对），失败 0 项 rows=53
+DS_SELFTEST_BASELINE 部署集：36 条引用（含 3 张位图尺寸核对），失败 0 项 rows=55
 $ bash tools/verify.sh
 === @boot === rows: 19 fail: []      === @play === rows: 30 fail: []
 === @routes === rows: 22 fail: []     === @save === rows: 26 fail: []
