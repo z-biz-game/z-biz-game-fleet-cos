@@ -829,6 +829,10 @@ function fsQuiet(p) {
 
 // 返回 true=请求进入，false=请求退出，null=不支持（调用方据此禁用按钮）。
 function toggleFullscreen(root) {
+  // 按钮直接挂本函数时首参是 MouseEvent，键盘 F / 门禁钩子则完全不传：
+  // 两者都不是全屏宿主。不回落到 fsRoot() 的话 fsRequest 拿不到 requestFullscreen，
+  // 对局里的全屏按钮会静默失效（或直接抛 TypeError），而顶栏那个按钮却是好的。
+  root = (root && (root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen)) ? root : fsRoot();
   const req = fsRequest(root);
   if (!req) return null;
   if (fsElement()) {
